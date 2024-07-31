@@ -10,6 +10,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require 'config.php';
 
+// Function to check if a record exists in a table
+function recordExists($pdo, $table, $column, $value)
+{
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM $table WHERE $column = :value");
+    $stmt->execute(['value' => $value]);
+    return $stmt->fetchColumn() > 0;
+}
+
+// Function to check if required fields are empty
+function validateFields($data, $requiredFields)
+{
+    foreach ($requiredFields as $field) {
+        if (empty($data[$field])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // Get all goals with player names
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetchGoals'])) {
     $stmt = $pdo->query("SELECT goals.GoalID, goals.PlayerID, goals.Date, goals.MatchID, goals.TimeScored, player.PlayerName, matches.Opponent
@@ -36,6 +55,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['GoalID'])) {
 // Create a new goal
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
+    $requiredFields = ['PlayerID', 'Date', 'MatchID', 'TimeScored'];
+
+    // Check for empty fields
+    if (!validateFields($data, $requiredFields)) {
+        echo json_encode(['error' => 'All fields are required']);
+        exit;
+    }
+
+    // Validate PlayerID
+    if (!recordExists($pdo, 'player', 'PlayerID', $data['PlayerID'])) {
+        echo json_encode(['error' => 'PlayerID does not exist']);
+        exit;
+    }
+
+    // Validate MatchID
+    if (!recordExists($pdo, 'matches', 'MatchID', $data['MatchID'])) {
+        echo json_encode(['error' => 'MatchID does not exist']);
+        exit;
+    }
+
     $sql = "INSERT INTO goals (PlayerID, Date, MatchID, TimeScored) 
             VALUES (:PlayerID, :Date, :MatchID, :TimeScored)";
     $stmt = $pdo->prepare($sql);
@@ -51,6 +90,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Update a goal
 if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     $data = json_decode(file_get_contents('php://input'), true);
+    $requiredFields = ['PlayerID', 'Date', 'MatchID', 'TimeScored', 'GoalID'];
+
+    // Check for empty fields
+    if (!validateFields($data, $requiredFields)) {
+        echo json_encode(['error' => 'All fields are required']);
+        exit;
+    }
+
+    // Validate PlayerID
+    if (!recordExists($pdo, 'player', 'PlayerID', $data['PlayerID'])) {
+        echo json_encode(['error' => 'PlayerID does not exist']);
+        exit;
+    }
+
+    // Validate MatchID
+    if (!recordExists($pdo, 'matches', 'MatchID', $data['MatchID'])) {
+        echo json_encode(['error' => 'MatchID does not exist']);
+        exit;
+    }
+
     $sql = "UPDATE goals SET PlayerID = :PlayerID, Date = :Date, MatchID = :MatchID, TimeScored = :TimeScored 
             WHERE GoalID = :GoalID";
     $stmt = $pdo->prepare($sql);
